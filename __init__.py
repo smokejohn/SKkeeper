@@ -31,7 +31,23 @@ bl_info = {
 import bpy
 from bpy.types import Operator
 
-class SDASK_OT_apply_mods_SK(Operator):
+def duplicate_object(obj):
+    """ duplicates the given object and its data """
+    pass
+
+def strip_shapekeys(sk_keep):
+    """ deletes all shapekeys except the one with the given index """
+    pass
+
+def apply_modifiers(obj):
+    """ applies all modifiers in order """
+    pass
+
+def add_objs_shapekeys(destination, sources):
+    """ takes an array of objects and adds them as shapekeys to the destination object """
+    pass
+
+class EF_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
     bl_idname = "utils.apply_mods_sk"
     bl_label = "Apply modifiers (Keep Shapekeys)"
@@ -64,12 +80,6 @@ class SDASK_OT_apply_mods_SK(Operator):
             self.report({'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
 
-        # check for subd-mod
-        # modtypes = [mod.type for mod in obj.modifiers]
-        # if 'SUBSURF' not in modtypes:
-        #     self.report({'ERROR'}, "The selected object doesn't have a subsurface modifier")
-        #     return {'CANCELLED'}
-
         # VALID OBJECT
 
         # duplicate object for each shapekey
@@ -85,7 +95,7 @@ class SDASK_OT_apply_mods_SK(Operator):
         return {'FINISHED'}
 
 def register():
-    bpy.utils.register_class(SDASK_OT_apply_mods_SK)
+    bpy.utils.register_class(EF_OT_apply_mods_SK)
 
 def unregister():
-    bpy.utils.unregister_class(SDASK_OT_apply_mods_SK)
+    bpy.utils.unregister_class(EF_OT_apply_mods_SK)
