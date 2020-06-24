@@ -3,7 +3,7 @@ This Addon automates the process of collapsing down a subdivision surface modifi
 
 ## How to Install
 
-Download the zipfile from the [Releases page]() and install via Blenders Addon-Preferences
+Download the zipfile from the [Releases page](https://github.com/smokejohn/bl_subd_apply_shapekey/releases) and install via Blenders Addon-Preferences
 
 Edit > Preferences > Add-ons > Install... > Select sd_apply_sk.zip
 
