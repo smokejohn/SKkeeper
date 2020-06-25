@@ -3,9 +3,12 @@ This Addon automates the process of collapsing down modifiers on a mesh with sha
 
 ## How to Install
 
-Download the zipfile from the [Releases page](https://github.com/smokejohn/bl_subd_apply_shapekey/releases) and install via Blenders Addon-Preferences
+Download the zipfile from the [Releases page](https://github.com/smokejohn/bl_apply_mods_shapekey/releases) and install via Blenders Addon-Preferences
 
 Edit > Preferences > Add-ons > Install... > Select apply_mods_sk.zip
 
 ## How to Use
-Open the quick search menu and look for "Apply modifiers (Keep Shapekeys)"
+
+This Addon adds 2 new commands which can be found in via the Quick Search floater (**Hotkey: F3 or Space**) and typing "Apply"
+* **Utils: Apply Modifiers (Keep Shapekeys)**
+* **Utils: Apply Subdivision (Keep Shapekeys)**
