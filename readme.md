@@ -9,6 +9,8 @@ Edit > Preferences > Add-ons > Install... > Select apply_mods_sk.zip
 
 ## How to Use
 
-This Addon adds 2 new commands which can be found in via the Quick Search floater (**Hotkey: F3 or Space**) and typing "Apply"
+This Addon adds 2 new commands which can be found in via the Quick Search floater (**Hotkey: F3 or Space**) and typing "Apply" or anything else in the names listed below:
 * **Utils: Apply Modifiers (Keep Shapekeys)**
 * **Utils: Apply Subdivision (Keep Shapekeys)**
+
+Select the Object you want to apply modifiers to and select one of the options.
