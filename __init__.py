@@ -31,7 +31,7 @@ bl_info = {
 import bpy
 from bpy.types import Operator
 
-def duplicate_object(obj, times=1, offset=3):
+def duplicate_object(obj, times=1, offset=0):
     """ duplicates the given object and its data """
     # TODO: implement this without using bpy.ops
     # would be faster and wouldn't clutter up the scene
