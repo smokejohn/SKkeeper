@@ -78,6 +78,14 @@ def apply_modifiers(obj):
     # for mod in modifiers:
     #     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=mod.name)
 
+
+def remove_modifiers(obj):
+    """ removes all modifiers from the object """
+
+    for i in reversed(range(0, len(obj.modifiers))):
+        modifier = obj.modifiers[i]
+        obj.modifiers.remove(modifier)
+
 def apply_subdmod(obj):
     """ applies subdivision surface modifier """
 
@@ -100,6 +108,7 @@ def add_objs_shapekeys(destination, sources):
 
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
+
 
 class EF_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
@@ -217,10 +226,13 @@ class EF_OT_apply_subd_SK(Operator):
         for i in range(0, len(blendshapes)):
             apply_shapekey(blendshapes[i], i)
 
-        # apply modifiers
-        for shape in blendshapes:
+        # apply subdivision surface modifier
+        # and remove all other modifiers
+        for i, shape in enumerate(blendshapes):
             apply_subdmod(shape)
-            # apply_modifiers(shape)
+            # skip the base object; only remove mods from shapes
+            if i != 0:
+                remove_modifiers(shape)
 
         # add meshes as shapekeys for the base - function
         add_objs_shapekeys(obj, blendshapes)
