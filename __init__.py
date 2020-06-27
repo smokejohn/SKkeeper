@@ -21,7 +21,7 @@
 bl_info = {
         "name": "Apply modifiers and keep shapekeys",
         "author": "Johannes Rauch",
-        "version": (1, 0),
+        "version": (1, 1),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
