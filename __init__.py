@@ -28,8 +28,16 @@ bl_info = {
         "category": "Utility",
         }
 
+import time
+
 import bpy
-from bpy.types import Operator
+from bpy.types import Operator, PropertyGroup
+from bpy.props import BoolProperty, CollectionProperty
+
+def log(msg):
+    t = time.localtime()
+    current_time = time.strftime("%H:%M", t)
+    print("<Keep Shapekeys {}> {}".format(current_time, (msg)))
 
 def duplicate_object(obj, times=1, offset=0):
     """ duplicates the given object and its data """
@@ -78,7 +86,6 @@ def apply_modifiers(obj):
     # for mod in modifiers:
     #     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=mod.name)
 
-
 def remove_modifiers(obj):
     """ removes all modifiers from the object """
 
@@ -98,6 +105,18 @@ def apply_subdmod(obj):
 
     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifiers[0].name)
 
+def apply_modifier(obj, modifier_name):
+    """ applies a specific modifier """
+
+    modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
+    
+    # deselect all
+    for o in bpy.context.scene.objects:
+        o.select_set(False)
+
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifier.name)
+
 def add_objs_shapekeys(destination, sources):
     """ takes an array of objects and adds them as shapekeys to the destination object """
     for o in bpy.context.scene.objects:
@@ -109,37 +128,38 @@ def add_objs_shapekeys(destination, sources):
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
 
+class EF_TYPE_Resource(PropertyGroup):
+    selected: BoolProperty(name="Selected", default=False)
 
 class EF_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
-    bl_idname = "utils.apply_mods_sk"
-    bl_label = "Apply Modifiers (Keep Shapekeys)"
+    bl_idname = "ef.apply_mods_sk"
+    bl_label = "Apply All Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        print("testing {}".format(self.bl_label))
 
-        obj = context.active_object
+        self.obj = context.active_object
 
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
-        if not obj:
+        if not self.obj:
             self.report({'ERROR'}, "No Active object. Please select an object")
             return {'CANCELLED'}
 
         # check for valid obj-type
-        if obj.type != 'MESH':
+        if self.obj.type != 'MESH':
             self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
             return {'CANCELLED'}
 
         # check for shapekeys
-        if not obj.data.shape_keys:
+        if not self.obj.data.shape_keys:
             self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
             return {'CANCELLED'}
 
         # check for modifiers
-        if len(obj.modifiers) == 0:
+        if len(self.obj.modifiers) == 0:
             self.report({'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
 
@@ -147,13 +167,13 @@ class EF_OT_apply_mods_SK(Operator):
 
         # get the shapekey names
         sk_names = []
-        for block in obj.data.shape_keys.key_blocks:
+        for block in self.obj.data.shape_keys.key_blocks:
             sk_names.append(block.name)
 
         # duplicate object for each shapekey
-        num_shapes = len(obj.data.shape_keys.key_blocks) - 1
-        blendshapes = duplicate_object(obj, times=num_shapes)
-        blendshapes.insert(0, obj)
+        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
+        blendshapes = duplicate_object(self.obj, times=num_shapes)
+        blendshapes.insert(0, self.obj)
 
         # clear/apply shapekeys
         for i in range(0, len(blendshapes)):
@@ -164,11 +184,11 @@ class EF_OT_apply_mods_SK(Operator):
             apply_modifiers(shape)
 
         # add meshes as shapekeys for the base - function
-        add_objs_shapekeys(obj, blendshapes)
+        add_objs_shapekeys(self.obj, blendshapes)
 
         # restore the names
         for i, name in enumerate(sk_names):
-            obj.data.shape_keys.key_blocks[i].name = name
+            self.obj.data.shape_keys.key_blocks[i].name = name
 
         # delete the duplicates
         for i in range(1, len(blendshapes)):
@@ -178,34 +198,33 @@ class EF_OT_apply_mods_SK(Operator):
 
 class EF_OT_apply_subd_SK(Operator):
     """ Applies subdivision surface and keeps shapekeys """
-    bl_idname = "utils.apply_subd_sk"
+    bl_idname = "ef.apply_subd_sk"
     bl_label = "Apply Subdivision (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        print("testing {}".format(self.bl_label))
 
-        obj = context.active_object
+        self.obj = context.active_object
 
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
-        if not obj:
+        if not self.obj:
             self.report({'ERROR'}, "No Active object. Please select an object")
             return {'CANCELLED'}
 
         # check for valid obj-type
-        if obj.type != 'MESH':
+        if self.obj.type != 'MESH':
             self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
             return {'CANCELLED'}
 
         # check for shapekeys
-        if not obj.data.shape_keys:
+        if not self.obj.data.shape_keys:
             self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
             return {'CANCELLED'}
 
         # check for subd modifiers
-        subd = [mod for mod in obj.modifiers if mod.type == 'SUBSURF']
+        subd = [mod for mod in self.obj.modifiers if mod.type == 'SUBSURF']
         if len(subd) == 0:
             self.report({'ERROR'}, "The selected object doesn't have any subdivision surface modifiers")
             return {'CANCELLED'}
@@ -214,13 +233,13 @@ class EF_OT_apply_subd_SK(Operator):
 
         # get the shapekey names
         sk_names = []
-        for block in obj.data.shape_keys.key_blocks:
+        for block in self.obj.data.shape_keys.key_blocks:
             sk_names.append(block.name)
 
         # duplicate object for each shapekey
-        num_shapes = len(obj.data.shape_keys.key_blocks) - 1
-        blendshapes = duplicate_object(obj, times=num_shapes)
-        blendshapes.insert(0, obj)
+        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
+        blendshapes = duplicate_object(self.obj, times=num_shapes)
+        blendshapes.insert(0, self.obj)
 
         # clear/apply shapekeys
         for i in range(0, len(blendshapes)):
@@ -235,11 +254,11 @@ class EF_OT_apply_subd_SK(Operator):
                 remove_modifiers(shape)
 
         # add meshes as shapekeys for the base - function
-        add_objs_shapekeys(obj, blendshapes)
+        add_objs_shapekeys(self.obj, blendshapes)
 
         # restore the names
         for i, name in enumerate(sk_names):
-            obj.data.shape_keys.key_blocks[i].name = name
+            self.obj.data.shape_keys.key_blocks[i].name = name
 
         # delete the duplicates
         for i in range(1, len(blendshapes)):
@@ -247,10 +266,104 @@ class EF_OT_apply_subd_SK(Operator):
 
         return {'FINISHED'}
 
-def register():
-    bpy.utils.register_class(EF_OT_apply_mods_SK)
-    bpy.utils.register_class(EF_OT_apply_subd_SK)
+class EF_OT_apply_mods_choice_SK(Operator):
+    """ Applies subdivision surface and keeps shapekeys """
+    bl_idname = "ef.apply_mods_choice_sk"
+    bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
+    bl_options = {'REGISTER', 'UNDO'}
 
-def unregister():
-    bpy.utils.unregister_class(EF_OT_apply_mods_SK)
-    bpy.utils.unregister_class(EF_OT_apply_subd_SK)
+    resource_list : CollectionProperty(name="Modifier List", type=EF_TYPE_Resource)
+
+    def invoke(self, context, event):
+
+        self.obj = context.active_object
+
+        # GUARD CLAUSES | USER ERROR
+
+        # check for valid selection
+        if not self.obj:
+            self.report({'ERROR'}, "No Active object. Please select an object")
+            return {'CANCELLED'}
+
+        # check for valid obj-type
+        if self.obj.type != 'MESH':
+            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
+            return {'CANCELLED'}
+
+        # check for shapekeys
+        if not self.obj.data.shape_keys:
+            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+            return {'CANCELLED'}
+
+        # check for modifiers
+        if len(self.obj.modifiers) == 0:
+            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
+            return {'CANCELLED'}
+
+        # populate the resource_list
+        self.resource_list.clear()
+        for mod in self.obj.modifiers:
+            entry = self.resource_list.add()
+            entry.name = mod.name
+
+        # display floating gui
+        return context.window_manager.invoke_props_dialog(self, width=350)
+
+    def execute(self, context):
+
+        # VALID OBJECT
+
+        # get the shapekey names
+        sk_names = []
+        for block in self.obj.data.shape_keys.key_blocks:
+            sk_names.append(block.name)
+
+        # duplicate object for each shapekey
+        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
+        blendshapes = duplicate_object(self.obj, times=num_shapes)
+        blendshapes.insert(0, self.obj)
+
+        # clear/apply shapekeys
+        for i in range(0, len(blendshapes)):
+            apply_shapekey(blendshapes[i], i)
+
+        # apply the selected modifiers
+        # and remove all other modifiers
+        for i, shape in enumerate(blendshapes):
+            for entry in self.resource_list:
+                if entry.selected:
+                    apply_modifier(shape, entry.name)
+
+            # skip the base object; only remove mods from shapes
+            if i != 0:
+                remove_modifiers(shape)
+
+        # add meshes as shapekeys for the base - function
+        add_objs_shapekeys(self.obj, blendshapes)
+
+        # restore the names
+        for i, name in enumerate(sk_names):
+            self.obj.data.shape_keys.key_blocks[i].name = name
+
+        # delete the duplicates
+        for i in range(1, len(blendshapes)):
+            bpy.data.objects.remove(blendshapes[i])
+
+        return {'FINISHED'}
+
+    def draw(self, context):
+        """ Draws the resource selection GUI """
+        layout = self.layout
+        col = layout.column(align=True)
+        for entry in self.resource_list:
+            row = col.row()
+            row.prop(entry, 'selected', text=entry.name)
+
+classes = (
+        EF_TYPE_Resource,
+        EF_OT_apply_mods_SK,
+        EF_OT_apply_subd_SK,
+        EF_OT_apply_mods_choice_SK
+        )
+
+register, unregister = bpy.utils.register_classes_factory(classes)
