@@ -21,11 +21,12 @@
 bl_info = {
         "name": "Apply modifiers and keep shapekeys",
         "author": "Johannes Rauch",
-        "version": (1, 1),
+        "version": (1, 2),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
         "category": "Utility",
+        "wiki_url": "https://github.com/smokejohn/bl_apply_mods_shapekey",
         }
 
 import time
