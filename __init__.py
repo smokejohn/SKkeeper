@@ -21,8 +21,8 @@
 bl_info = {
         "name": "Apply modifiers and keep shapekeys",
         "author": "Johannes Rauch",
-        "version": (1, 2),
-        "blender": (2, 80, 3),
+        "version": (1, 3),
+        "blender": (2, 90, 1),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
         "category": "Utility",
@@ -104,7 +104,7 @@ def apply_subdmod(obj):
         o.select_set(False)
     bpy.context.view_layer.objects.active = obj
 
-    bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifiers[0].name)
+    bpy.ops.object.modifier_apply(modifier=modifiers[0].name)
 
 def apply_modifier(obj, modifier_name):
     """ applies a specific modifier """
@@ -116,7 +116,7 @@ def apply_modifier(obj, modifier_name):
         o.select_set(False)
 
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifier.name)
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
 
 def add_objs_shapekeys(destination, sources):
     """ takes an array of objects and adds them as shapekeys to the destination object """
