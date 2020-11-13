@@ -9,7 +9,7 @@ Edit > Preferences > Add-ons > Install... > Select apply_mods_sk.zip
 
 ## How to Use
 
-This Addon adds 3 new operators which can be found in via the Quick Search floater (**Hotkey: F3 or Space**) and typing "Apply" or anything else in the names listed below:
+This Addon adds 3 new operators which can be found in via the Quick Search floater (**Hotkey: F3 or Space**) and typing "ef" or anything else in the names listed below:
 * **Ef: Apply All Modifiers (Keep Shapekeys)**
   * Applies all modifiers on the object
 * **Ef: Apply Subdivision (Keep Shapekeys)**
