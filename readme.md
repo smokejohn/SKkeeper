@@ -11,7 +11,7 @@ Edit > Preferences > Add-ons > Install... > Select apply_mods_sk.zip
 
 This Addon adds 3 new operators which can be found in the 3DViews Object Menu:
 
-![Addons operators in the 3DView Object Menu](images/bl_gui_3DVIEW_MT_object.png)
+<img align="right" src="images/bl_gui_3DVIEW_MT_object.png"/>
 
 * **Ef: Apply All Modifiers (Keep Shapekeys)**
   * Applies all modifiers on the object
