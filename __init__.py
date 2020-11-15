@@ -22,7 +22,7 @@ bl_info = {
         "name": "Apply modifiers and keep shapekeys",
         "author": "Johannes Rauch",
         "version": (1, 3),
-        "blender": (2, 90, 1),
+        "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
         "category": "Utility",
@@ -313,6 +313,7 @@ class EF_OT_apply_mods_choice_SK(Operator):
     def execute(self, context):
 
         # VALID OBJECT
+        context = bpy.context
 
         # get the shapekey names
         sk_names = []
@@ -367,4 +368,25 @@ classes = (
         EF_OT_apply_mods_choice_SK
         )
 
-register, unregister = bpy.utils.register_classes_factory(classes)
+
+def modifier_panel(self, context):
+    layout = self.layout
+    # if context.active_object.data.shape_keys:
+    layout.separator()
+    layout.operator("ef.apply_mods_sk")
+    layout.operator("ef.apply_mods_choice_sk")
+    layout.operator("ef.apply_subd_sk")
+
+def register():
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)
+
+    bpy.types.VIEW3D_MT_object.append(modifier_panel)
+
+def unregister():
+    from bpy.utils import unregister_class
+    for cls in classes:
+        unregister_class(cls)
+
+    bpy.types.VIEW3D_MT_object.remove(modifier_panel)
