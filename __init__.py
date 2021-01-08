@@ -1,7 +1,7 @@
 ##
 ##  GPL License
 ##
-##  Blender Addon | Apply modifiers and keep shapekeys
+##  Blender Addon | SKkeeper
 ##  Copyright (C) 2020  Johannes Rauch
 ##
 ##  This program is free software: you can redistribute it and/or modify
@@ -19,14 +19,14 @@
 
 
 bl_info = {
-        "name": "Apply modifiers and keep shapekeys",
+        "name": "SKkeeper",
         "author": "Johannes Rauch",
-        "version": (1, 3),
+        "version": (1, 4),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
         "category": "Utility",
-        "wiki_url": "https://github.com/smokejohn/bl_apply_mods_shapekey",
+        "wiki_url": "https://github.com/smokejohn/SKkeeper",
         }
 
 import time
@@ -38,7 +38,7 @@ from bpy.props import BoolProperty, CollectionProperty
 def log(msg):
     t = time.localtime()
     current_time = time.strftime("%H:%M", t)
-    print("<Keep Shapekeys {}> {}".format(current_time, (msg)))
+    print("<SKkeeper {}> {}".format(current_time, (msg)))
 
 def duplicate_object(obj, times=1, offset=0):
     """ duplicates the given object and its data """
@@ -72,7 +72,7 @@ def apply_shapekey(obj, sk_keep):
 
 def apply_modifiers(obj):
     """ applies all modifiers in order """
-    # now uses object.convert to circumevent errors with disabled modifiers
+    # now uses object.convert to circumvent errors with disabled modifiers
 
     # modifiers = obj.modifiers
 
@@ -129,12 +129,12 @@ def add_objs_shapekeys(destination, sources):
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
 
-class EF_TYPE_Resource(PropertyGroup):
+class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
 
-class EF_OT_apply_mods_SK(Operator):
+class SK_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
-    bl_idname = "ef.apply_mods_sk"
+    bl_idname = "sk.apply_mods_sk"
     bl_label = "Apply All Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -157,6 +157,11 @@ class EF_OT_apply_mods_SK(Operator):
         # check for shapekeys
         if not self.obj.data.shape_keys:
             self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+            return {'CANCELLED'}
+
+        # check for multiple shapekeys
+        if len(self.obj.data.shape_keys.key_blocks) == 1:
+            self.report({'ERROR'}, "The selected object only has a base shapekey")
             return {'CANCELLED'}
 
         # check for modifiers
@@ -197,9 +202,9 @@ class EF_OT_apply_mods_SK(Operator):
 
         return {'FINISHED'}
 
-class EF_OT_apply_subd_SK(Operator):
+class SK_OT_apply_subd_SK(Operator):
     """ Applies subdivision surface and keeps shapekeys """
-    bl_idname = "ef.apply_subd_sk"
+    bl_idname = "sk.apply_subd_sk"
     bl_label = "Apply Subdivision (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -222,6 +227,11 @@ class EF_OT_apply_subd_SK(Operator):
         # check for shapekeys
         if not self.obj.data.shape_keys:
             self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+            return {'CANCELLED'}
+
+        # check for multiple shapekeys
+        if len(self.obj.data.shape_keys.key_blocks) == 1:
+            self.report({'ERROR'}, "The selected object only has a base shapekey")
             return {'CANCELLED'}
 
         # check for subd modifiers
@@ -267,13 +277,13 @@ class EF_OT_apply_subd_SK(Operator):
 
         return {'FINISHED'}
 
-class EF_OT_apply_mods_choice_SK(Operator):
+class SK_OT_apply_mods_choice_SK(Operator):
     """ Applies subdivision surface and keeps shapekeys """
-    bl_idname = "ef.apply_mods_choice_sk"
+    bl_idname = "sk.apply_mods_choice_sk"
     bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    resource_list : CollectionProperty(name="Modifier List", type=EF_TYPE_Resource)
+    resource_list : CollectionProperty(name="Modifier List", type=SK_TYPE_Resource)
 
     def invoke(self, context, event):
 
@@ -294,6 +304,11 @@ class EF_OT_apply_mods_choice_SK(Operator):
         # check for shapekeys
         if not self.obj.data.shape_keys:
             self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+            return {'CANCELLED'}
+
+        # check for multiple shapekeys
+        if len(self.obj.data.shape_keys.key_blocks) == 1:
+            self.report({'ERROR'}, "The selected object only has a base shapekey")
             return {'CANCELLED'}
 
         # check for modifiers
@@ -362,10 +377,10 @@ class EF_OT_apply_mods_choice_SK(Operator):
             row.prop(entry, 'selected', text=entry.name)
 
 classes = (
-        EF_TYPE_Resource,
-        EF_OT_apply_mods_SK,
-        EF_OT_apply_subd_SK,
-        EF_OT_apply_mods_choice_SK
+        SK_TYPE_Resource,
+        SK_OT_apply_mods_SK,
+        SK_OT_apply_subd_SK,
+        SK_OT_apply_mods_choice_SK
         )
 
 
@@ -373,9 +388,9 @@ def modifier_panel(self, context):
     layout = self.layout
     # if context.active_object.data.shape_keys:
     layout.separator()
-    layout.operator("ef.apply_mods_sk")
-    layout.operator("ef.apply_mods_choice_sk")
-    layout.operator("ef.apply_subd_sk")
+    layout.operator("sk.apply_mods_sk")
+    layout.operator("sk.apply_mods_choice_sk")
+    layout.operator("sk.apply_subd_sk")
 
 def register():
     from bpy.utils import register_class
