@@ -21,7 +21,7 @@
 bl_info = {
         "name": "SKkeeper",
         "author": "Johannes Rauch",
-        "version": (1, 4),
+        "version": (1, 5),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
