@@ -40,10 +40,34 @@ def log(msg):
     current_time = time.strftime("%H:%M", t)
     print("<SKkeeper {}> {}".format(current_time, (msg)))
 
+def copy_object(obj, times=1, offset=0):
+    # TODO: get the collection of the source and link the object to
+    # that collection instead of the scene main collection
+
+
+    objects = []
+    for i in range(0,times):
+        copy_obj = obj.copy()
+        copy_obj.data = obj.data.copy()
+        copy_obj.name = obj.name + "_shapekey_" + str(i+1)
+        copy_obj.location.x += offset*(i+1)
+
+        bpy.context.collection.objects.link(copy_obj)
+        objects.append(copy_obj)
+
+    return objects
+
 def duplicate_object(obj, times=1, offset=0):
     """ duplicates the given object and its data """
     # TODO: implement this without using bpy.ops
     # would be faster and wouldn't clutter up the scene
+
+    for o in bpy.context.scene.objects:
+        o.select_set(False)
+
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
     objects = []
     for i in range(0, times):
         bpy.ops.object.duplicate()
@@ -132,16 +156,13 @@ def add_objs_shapekeys(destination, sources):
 class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
 
-class SK_OT_apply_mods_SK(Operator):
+class SK_OT_apply_mods_seq_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
-    bl_idname = "sk.apply_mods_sk"
-    bl_label = "Apply All Modifiers (Keep Shapekeys)"
+    bl_idname = "sk.apply_mods_seq_sk"
+    bl_label = "Apply All Modifiers (High-Performance)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):
-
-        self.obj = context.active_object
-
+    def validate_input(self, obj):
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
@@ -167,6 +188,101 @@ class SK_OT_apply_mods_SK(Operator):
         # check for modifiers
         if len(self.obj.modifiers) == 0:
             self.report({'ERROR'}, "The selected object doesn't have any modifiers")
+            return {'CANCELLED'}
+
+    def execute(self, context):
+        self.obj = context.active_object
+
+        # check for valid object
+        if self.validate_input(self.obj) == {'CANCELLED'}:
+            return {'CANCELLED'}
+
+        # VALID OBJECT
+
+        # get the shapekey names
+        sk_names = []
+        for block in self.obj.data.shape_keys.key_blocks:
+            sk_names.append(block.name)
+
+        # create receiving object that will contain all collapsed shapekeys
+        receiver = copy_object(self.obj, times=1, offset=0)[0]
+        apply_shapekey(receiver, 0)
+        apply_modifiers(receiver)
+        receiver.name = "sk_receiver"
+
+        num_shapes = len(self.obj.data.shape_keys.key_blocks)
+
+        # create a copy for each blendshape and transfer it to the receiver one after the other
+        # start the loop at 1 so we skip the base shapekey
+        for i in range(1, num_shapes):
+            # copy of baseobject / blendshape donor
+            blendshape = duplicate_object(self.obj, times=1, offset=0)[0]
+            apply_shapekey(blendshape, i)
+            apply_modifiers(blendshape)
+
+            # add the copy as a blendshape to the receiver
+            add_objs_shapekeys(receiver, [blendshape])
+
+            # restore the shapekey name
+            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
+
+            # delete the blendshape donor and its mesh datablock (save memory)
+            mesh_data = blendshape.data
+            bpy.data.objects.remove(blendshape)
+            bpy.data.meshes.remove(mesh_data)
+
+
+        # delete the original and its mesh data
+        orig_name = self.obj.name
+        orig_data = self.obj.data
+        bpy.data.objects.remove(self.obj)
+        bpy.data.meshes.remove(orig_data)
+
+        # rename the receiver
+        receiver.name = orig_name
+
+        return {'FINISHED'}
+
+class SK_OT_apply_mods_SK(Operator):
+    """ Applies modifiers and keeps shapekeys """
+    bl_idname = "sk.apply_mods_sk"
+    bl_label = "Apply All Modifiers (Keep Shapekeys)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def validate_input(self, obj):
+        # GUARD CLAUSES | USER ERROR
+
+        # check for valid selection
+        if not self.obj:
+            self.report({'ERROR'}, "No Active object. Please select an object")
+            return {'CANCELLED'}
+
+        # check for valid obj-type
+        if self.obj.type != 'MESH':
+            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
+            return {'CANCELLED'}
+
+        # check for shapekeys
+        if not self.obj.data.shape_keys:
+            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+            return {'CANCELLED'}
+
+        # check for multiple shapekeys
+        if len(self.obj.data.shape_keys.key_blocks) == 1:
+            self.report({'ERROR'}, "The selected object only has a base shapekey")
+            return {'CANCELLED'}
+
+        # check for modifiers
+        if len(self.obj.modifiers) == 0:
+            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
+            return {'CANCELLED'}
+
+    def execute(self, context):
+
+        self.obj = context.active_object
+
+        # check for valid object
+        if self.validate_input(self.obj) == {'CANCELLED'}:
             return {'CANCELLED'}
 
         # VALID OBJECT
@@ -208,10 +324,7 @@ class SK_OT_apply_subd_SK(Operator):
     bl_label = "Apply Subdivision (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):
-
-        self.obj = context.active_object
-
+    def validate_input(self, obj):
         # GUARD CLAUSES | USER ERROR
 
         # check for valid selection
@@ -238,6 +351,14 @@ class SK_OT_apply_subd_SK(Operator):
         subd = [mod for mod in self.obj.modifiers if mod.type == 'SUBSURF']
         if len(subd) == 0:
             self.report({'ERROR'}, "The selected object doesn't have any subdivision surface modifiers")
+            return {'CANCELLED'}
+
+    def execute(self, context):
+
+        self.obj = context.active_object
+
+        # check for valid object
+        if self.validate_input(self.obj) == {'CANCELLED'}:
             return {'CANCELLED'}
 
         # VALID OBJECT
@@ -379,6 +500,7 @@ class SK_OT_apply_mods_choice_SK(Operator):
 classes = (
         SK_TYPE_Resource,
         SK_OT_apply_mods_SK,
+        SK_OT_apply_mods_seq_SK,
         SK_OT_apply_subd_SK,
         SK_OT_apply_mods_choice_SK
         )
@@ -389,6 +511,7 @@ def modifier_panel(self, context):
     # if context.active_object.data.shape_keys:
     layout.separator()
     layout.operator("sk.apply_mods_sk")
+    layout.operator("sk.apply_mods_seq_sk")
     layout.operator("sk.apply_mods_choice_sk")
     layout.operator("sk.apply_subd_sk")
 
