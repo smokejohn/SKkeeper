@@ -17,11 +17,10 @@
 ##  You should have received a copy of the GNU General Public License
 ##  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 bl_info = {
         "name": "SKkeeper",
         "author": "Johannes Rauch",
-        "version": (1, 5),
+        "version": (1, 6),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
@@ -36,14 +35,16 @@ from bpy.types import Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty
 
 def log(msg):
+    """ prints to console in the following format:
+        <SKkeeper Time(HH:MM)> message
+    """
     t = time.localtime()
     current_time = time.strftime("%H:%M", t)
     print("<SKkeeper {}> {}".format(current_time, (msg)))
 
 def copy_object(obj, times=1, offset=0):
-    # TODO: get the collection of the source and link the object to
+    # TODO: maybe get the collection of the source and link the object to
     # that collection instead of the scene main collection
-
 
     objects = []
     for i in range(0,times):
@@ -59,8 +60,8 @@ def copy_object(obj, times=1, offset=0):
 
 def duplicate_object(obj, times=1, offset=0):
     """ duplicates the given object and its data """
-    # TODO: implement this without using bpy.ops
-    # would be faster and wouldn't clutter up the scene
+
+    # DEPRECATED >> USE copy_object instead
 
     for o in bpy.context.scene.objects:
         o.select_set(False)
@@ -98,7 +99,10 @@ def apply_modifiers(obj):
     """ applies all modifiers in order """
     # now uses object.convert to circumvent errors with disabled modifiers
 
-    # modifiers = obj.modifiers
+    modifiers = obj.modifiers
+    for modifier in modifiers:
+        if modifier.type == 'SUBSURF':
+            modifier.show_only_control_edges = False
 
     for o in bpy.context.scene.objects:
         o.select_set(False)
@@ -128,10 +132,14 @@ def apply_subdmod(obj):
         o.select_set(False)
     bpy.context.view_layer.objects.active = obj
 
+    modifiers[0].show_only_control_edges = False
     bpy.ops.object.modifier_apply(modifier=modifiers[0].name)
 
 def apply_modifier(obj, modifier_name):
     """ applies a specific modifier """
+
+    log("Applying chosen modifier")
+    log(obj)
 
     modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
     
@@ -156,10 +164,10 @@ def add_objs_shapekeys(destination, sources):
 class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
 
-class SK_OT_apply_mods_seq_SK(Operator):
+class SK_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
-    bl_idname = "sk.apply_mods_seq_sk"
-    bl_label = "Apply All Modifiers (High-Performance)"
+    bl_idname = "sk.apply_mods_sk"
+    bl_label = "Apply All Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def validate_input(self, obj):
@@ -206,9 +214,9 @@ class SK_OT_apply_mods_seq_SK(Operator):
 
         # create receiving object that will contain all collapsed shapekeys
         receiver = copy_object(self.obj, times=1, offset=0)[0]
+        receiver.name = "sk_receiver"
         apply_shapekey(receiver, 0)
         apply_modifiers(receiver)
-        receiver.name = "sk_receiver"
 
         num_shapes = len(self.obj.data.shape_keys.key_blocks)
 
@@ -216,7 +224,7 @@ class SK_OT_apply_mods_seq_SK(Operator):
         # start the loop at 1 so we skip the base shapekey
         for i in range(1, num_shapes):
             # copy of baseobject / blendshape donor
-            blendshape = duplicate_object(self.obj, times=1, offset=0)[0]
+            blendshape = copy_object(self.obj, times=1, offset=0)[0]
             apply_shapekey(blendshape, i)
             apply_modifiers(blendshape)
 
@@ -243,85 +251,10 @@ class SK_OT_apply_mods_seq_SK(Operator):
 
         return {'FINISHED'}
 
-class SK_OT_apply_mods_SK(Operator):
-    """ Applies modifiers and keeps shapekeys """
-    bl_idname = "sk.apply_mods_sk"
-    bl_label = "Apply All Modifiers (Keep Shapekeys)"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def validate_input(self, obj):
-        # GUARD CLAUSES | USER ERROR
-
-        # check for valid selection
-        if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
-
-        # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
-
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
-
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
-            return {'CANCELLED'}
-
-        # check for modifiers
-        if len(self.obj.modifiers) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
-            return {'CANCELLED'}
-
-    def execute(self, context):
-
-        self.obj = context.active_object
-
-        # check for valid object
-        if self.validate_input(self.obj) == {'CANCELLED'}:
-            return {'CANCELLED'}
-
-        # VALID OBJECT
-
-        # get the shapekey names
-        sk_names = []
-        for block in self.obj.data.shape_keys.key_blocks:
-            sk_names.append(block.name)
-
-        # duplicate object for each shapekey
-        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
-        blendshapes = duplicate_object(self.obj, times=num_shapes)
-        blendshapes.insert(0, self.obj)
-
-        # clear/apply shapekeys
-        for i in range(0, len(blendshapes)):
-            apply_shapekey(blendshapes[i], i)
-
-        # apply modifiers
-        for shape in blendshapes:
-            apply_modifiers(shape)
-
-        # add meshes as shapekeys for the base - function
-        add_objs_shapekeys(self.obj, blendshapes)
-
-        # restore the names
-        for i, name in enumerate(sk_names):
-            self.obj.data.shape_keys.key_blocks[i].name = name
-
-        # delete the duplicates
-        for i in range(1, len(blendshapes)):
-            bpy.data.objects.remove(blendshapes[i])
-
-        return {'FINISHED'}
-
 class SK_OT_apply_subd_SK(Operator):
-    """ Applies subdivision surface and keeps shapekeys """
+    """ Applies modifiers and keeps shapekeys """
     bl_idname = "sk.apply_subd_sk"
-    bl_label = "Apply Subdivision (Keep Shapekeys)"
+    bl_label = "Apply All Subdivision (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
     def validate_input(self, obj):
@@ -354,7 +287,6 @@ class SK_OT_apply_subd_SK(Operator):
             return {'CANCELLED'}
 
     def execute(self, context):
-
         self.obj = context.active_object
 
         # check for valid object
@@ -368,38 +300,47 @@ class SK_OT_apply_subd_SK(Operator):
         for block in self.obj.data.shape_keys.key_blocks:
             sk_names.append(block.name)
 
-        # duplicate object for each shapekey
-        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
-        blendshapes = duplicate_object(self.obj, times=num_shapes)
-        blendshapes.insert(0, self.obj)
+        # create receiving object that will contain all collapsed shapekeys
+        receiver = copy_object(self.obj, times=1, offset=0)[0]
+        receiver.name = "sk_receiver"
+        apply_shapekey(receiver, 0)
+        apply_subdmod(receiver)
 
-        # clear/apply shapekeys
-        for i in range(0, len(blendshapes)):
-            apply_shapekey(blendshapes[i], i)
+        num_shapes = len(self.obj.data.shape_keys.key_blocks)
 
-        # apply subdivision surface modifier
-        # and remove all other modifiers
-        for i, shape in enumerate(blendshapes):
-            apply_subdmod(shape)
-            # skip the base object; only remove mods from shapes
-            if i != 0:
-                remove_modifiers(shape)
+        # create a copy for each blendshape and transfer it to the receiver one after the other
+        # start the loop at 1 so we skip the base shapekey
+        for i in range(1, num_shapes):
+            # copy of baseobject / blendshape donor
+            blendshape = copy_object(self.obj, times=1, offset=0)[0]
+            apply_shapekey(blendshape, i)
+            apply_subdmod(blendshape)
 
-        # add meshes as shapekeys for the base - function
-        add_objs_shapekeys(self.obj, blendshapes)
+            # add the copy as a blendshape to the receiver
+            add_objs_shapekeys(receiver, [blendshape])
 
-        # restore the names
-        for i, name in enumerate(sk_names):
-            self.obj.data.shape_keys.key_blocks[i].name = name
+            # restore the shapekey name
+            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
 
-        # delete the duplicates
-        for i in range(1, len(blendshapes)):
-            bpy.data.objects.remove(blendshapes[i])
+            # delete the blendshape donor and its mesh datablock (save memory)
+            mesh_data = blendshape.data
+            bpy.data.objects.remove(blendshape)
+            bpy.data.meshes.remove(mesh_data)
+
+
+        # delete the original and its mesh data
+        orig_name = self.obj.name
+        orig_data = self.obj.data
+        bpy.data.objects.remove(self.obj)
+        bpy.data.meshes.remove(orig_data)
+
+        # rename the receiver
+        receiver.name = orig_name
 
         return {'FINISHED'}
 
 class SK_OT_apply_mods_choice_SK(Operator):
-    """ Applies subdivision surface and keeps shapekeys """
+    """ Applies modifiers and keeps shapekeys """
     bl_idname = "sk.apply_mods_choice_sk"
     bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
@@ -407,7 +348,6 @@ class SK_OT_apply_mods_choice_SK(Operator):
     resource_list : CollectionProperty(name="Modifier List", type=SK_TYPE_Resource)
 
     def invoke(self, context, event):
-
         self.obj = context.active_object
 
         # GUARD CLAUSES | USER ERROR
@@ -449,43 +389,62 @@ class SK_OT_apply_mods_choice_SK(Operator):
     def execute(self, context):
 
         # VALID OBJECT
-        context = bpy.context
 
         # get the shapekey names
         sk_names = []
         for block in self.obj.data.shape_keys.key_blocks:
             sk_names.append(block.name)
 
-        # duplicate object for each shapekey
-        num_shapes = len(self.obj.data.shape_keys.key_blocks) - 1
-        blendshapes = duplicate_object(self.obj, times=num_shapes)
-        blendshapes.insert(0, self.obj)
-
-        # clear/apply shapekeys
-        for i in range(0, len(blendshapes)):
-            apply_shapekey(blendshapes[i], i)
-
+        # create receiving object that will contain all collapsed shapekeys
+        receiver = copy_object(self.obj, times=1, offset=0)[0]
+        receiver.name = "sk_receiver"
+        # bake in the shapekey
+        apply_shapekey(receiver, 0)
         # apply the selected modifiers
-        # and remove all other modifiers
-        for i, shape in enumerate(blendshapes):
+        for entry in self.resource_list:
+            if entry.selected:
+                apply_modifier(receiver, entry.name)
+        # change its name
+
+        # get the number of shapekeys on the original mesh
+        num_shapes = len(self.obj.data.shape_keys.key_blocks)
+
+        # create a copy for each blendshape and transfer it to the receiver one after the other
+        # start the loop at 1 so we skip the base shapekey
+        for i in range(1, num_shapes):
+            # copy of baseobject / blendshape donor
+            blendshape = copy_object(self.obj, times=1, offset=0)[0]
+            # bake shapekey
+            apply_shapekey(blendshape, i)
+            # # apply the selected modifiers
             for entry in self.resource_list:
                 if entry.selected:
-                    apply_modifier(shape, entry.name)
+                    log(entry.name)
+                    apply_modifier(blendshape, entry.name)
 
-            # skip the base object; only remove mods from shapes
-            if i != 0:
-                remove_modifiers(shape)
+            # remove all the other modifiers
+            # they are not needed the receiver object has them
+            remove_modifiers(blendshape)
 
-        # add meshes as shapekeys for the base - function
-        add_objs_shapekeys(self.obj, blendshapes)
+            # add the copy as a blendshape to the receiver
+            add_objs_shapekeys(receiver, [blendshape])
 
-        # restore the names
-        for i, name in enumerate(sk_names):
-            self.obj.data.shape_keys.key_blocks[i].name = name
+            # restore the shapekey name
+            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
 
-        # delete the duplicates
-        for i in range(1, len(blendshapes)):
-            bpy.data.objects.remove(blendshapes[i])
+            # delete the blendshape donor and its mesh datablock (save memory)
+            mesh_data = blendshape.data
+            bpy.data.objects.remove(blendshape)
+            bpy.data.meshes.remove(mesh_data)
+
+        # delete the original and its mesh data
+        orig_name = self.obj.name
+        orig_data = self.obj.data
+        bpy.data.objects.remove(self.obj)
+        bpy.data.meshes.remove(orig_data)
+
+        # rename the receiver
+        receiver.name = orig_name
 
         return {'FINISHED'}
 
@@ -500,20 +459,16 @@ class SK_OT_apply_mods_choice_SK(Operator):
 classes = (
         SK_TYPE_Resource,
         SK_OT_apply_mods_SK,
-        SK_OT_apply_mods_seq_SK,
         SK_OT_apply_subd_SK,
         SK_OT_apply_mods_choice_SK
         )
 
-
 def modifier_panel(self, context):
     layout = self.layout
-    # if context.active_object.data.shape_keys:
     layout.separator()
     layout.operator("sk.apply_mods_sk")
-    layout.operator("sk.apply_mods_seq_sk")
-    layout.operator("sk.apply_mods_choice_sk")
     layout.operator("sk.apply_subd_sk")
+    layout.operator("sk.apply_mods_choice_sk")
 
 def register():
     from bpy.utils import register_class
