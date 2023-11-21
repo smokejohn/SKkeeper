@@ -27,6 +27,7 @@ If applicable, add screenshots to help explain your problem.
  - Blender Version: [e.g. 3.6]
  - OS: [e.g. Windows, Mac OS]
 
+**PLEASE attach the file that you are having errors with to your issue message. If it contains sensitive data, remove it and supply a minimal version that still produces the error**
 
 **Additional context**
 Add any other context about the problem here.
