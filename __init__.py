@@ -253,7 +253,7 @@ def keep_shapekeys(self, mode=Mode.ALL):
 
         # check if the shapekey could be added
         # due to problematic modifier stack
-        help_url = "https://github.com/smokejohn/SKkeeper/blob/master/readme.md"
+        help_url = "https://github.com/smokejohn/SKkeeper/blob/master/readme.md#troubleshooting-problems"
         if receiver.data.shape_keys is None:
             error_msg = ("IMPOSSIBLE TO TRANSFER SHAPEKEY BECAUSE OF VERTEX COUNT MISMATCH\n\n"
                          "The processed shapekey {} with name {} cannot be transferred.\n"
