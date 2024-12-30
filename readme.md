@@ -16,7 +16,7 @@ Edit > Preferences > Add-ons > Install... > Select SKkeeper.zip
 
 This Addon adds 3 new operators which can be found in the 3DViews Object Menu:
 
-<img style="margin-right: 30px;" align="left" src="images/bl_gui_3DVIEW_MT_object.png"/>
+![Showing the new operators in the blender object menu](images/bl_gui_3DVIEW_MT_object.png)
 
 * **Sk: Apply All Modifiers (Keep Shapekeys)**
   * Applies all modifiers on the object
