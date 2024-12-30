@@ -20,7 +20,7 @@
 bl_info = {
         "name": "SKkeeper",
         "author": "Johannes Rauch",
-        "version": (1, 6),
+        "version": (1, 7),
         "blender": (2, 80, 3),
         "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
@@ -30,9 +30,20 @@ bl_info = {
 
 import time
 
+from enum import Enum
+
 import bpy
 from bpy.types import Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty
+
+class Mode(Enum):
+    ALL = 0
+    SUBD = 1
+    SELECTED = 2
+
+#####################
+# UTILITY FUNCTIONS #
+#####################
 
 def log(msg):
     """ prints to console in the following format:
@@ -43,6 +54,8 @@ def log(msg):
     print("<SKkeeper {}> {}".format(current_time, (msg)))
 
 def copy_object(obj, times=1, offset=0):
+    """ copies the given object and links it to the main collection"""
+
     # TODO: maybe get the collection of the source and link the object to
     # that collection instead of the scene main collection
 
@@ -81,6 +94,7 @@ def duplicate_object(obj, times=1, offset=0):
 
 def apply_shapekey(obj, sk_keep):
     """ deletes all shapekeys except the one with the given index """
+
     shapekeys = obj.data.shape_keys.key_blocks
 
     # check for valid index
@@ -112,8 +126,13 @@ def apply_modifiers(obj):
 
     bpy.ops.object.convert(target='MESH')
 
-    # for mod in modifiers:
-    #     bpy.ops.object.modifier_apply(apply_as='DATA', modifier=mod.name)
+def apply_selected_modifiers(obj, resource_list):
+    """ applies only the user selected modifiers to the object"""
+
+    for entry in resource_list:
+        if entry.selected:
+            log("Applying modifier {} on object {}".format(entry.name, obj.name))
+            apply_modifier(obj, entry.name)
 
 def remove_modifiers(obj):
     """ removes all modifiers from the object """
@@ -139,7 +158,6 @@ def apply_modifier(obj, modifier_name):
     """ applies a specific modifier """
 
     log("Applying chosen modifier")
-    log(obj)
 
     modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
     
@@ -161,6 +179,129 @@ def add_objs_shapekeys(destination, sources):
     bpy.context.view_layer.objects.active = destination
     bpy.ops.object.join_shapes()
 
+
+def common_validation(self):
+    """Checks for common user errors for all operators and informs user of mistake"""
+
+    # GUARD CLAUSES | USER ERROR
+
+    # check for valid selection
+    if not self.obj:
+        self.report({'ERROR'}, "No Active object. Please select an object")
+        return {'CANCELLED'}
+
+    # check for valid obj-type
+    if self.obj.type != 'MESH':
+        self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
+        return {'CANCELLED'}
+
+    # check for shapekeys
+    if not self.obj.data.shape_keys:
+        self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
+        return {'CANCELLED'}
+
+    # check for multiple shapekeys
+    if len(self.obj.data.shape_keys.key_blocks) == 1:
+        self.report({'ERROR'}, "The selected object only has a base shapekey")
+        return {'CANCELLED'}
+
+def keep_shapekeys(self, mode=Mode.ALL):
+    """
+    Function which is used by the blender operators to collapse modifier
+    stack and keep shapekeys. The given mode parameter will determine which
+    execution style will be used. The available modes match those of the
+    available blender operators (SUBD, SELECTED, ALL) which collapse only
+    subdivision surface, the selected or all modifiers respectively.
+    """
+
+    shapekey_names = [block.name for block in self.obj.data.shape_keys.key_blocks]
+
+    # create receiving object that will contain all collapsed shapekeys
+    receiver = copy_object(self.obj, times=1, offset=0)[0]
+    receiver.name = "shapekey_receiver"
+    apply_shapekey(receiver, 0)
+    if mode == Mode.ALL:
+        apply_modifiers(receiver)
+    elif mode == Mode.SUBD:
+        apply_subdmod(receiver)
+    elif mode == Mode.SELECTED:
+        apply_selected_modifiers(receiver, self.resource_list)
+
+    num_shapekeys = len(self.obj.data.shape_keys.key_blocks)
+
+    shapekeys_to_process = len(shapekey_names) - 1
+    log("Processing {} shapekeys on {} in mode {}".format(shapekeys_to_process, self.obj.name, mode))
+
+    # create a copy for each shapekey and transfer it to the receiver one after the other
+    # start the loop at 1 so we skip the base shapekey
+    for shapekey_index in range(1, num_shapekeys):
+        log("Processing shapekey {} with name {}".format(shapekey_index, shapekey_names[shapekey_index]))
+
+        # copy of baseobject / shapekey donor
+        shapekey_obj = copy_object(self.obj, times=1, offset=0)[0]
+        apply_shapekey(shapekey_obj, shapekey_index)
+        if mode == Mode.ALL:
+            apply_modifiers(shapekey_obj)
+        elif mode == Mode.SUBD:
+            apply_subdmod(shapekey_obj)
+        elif mode == Mode.SELECTED:
+            apply_selected_modifiers(shapekey_obj, self.resource_list)
+
+        # add the copy as a shapekey to the receiver
+        add_objs_shapekeys(receiver, [shapekey_obj])
+
+
+        # check if the shapekey could be added
+        # due to problematic modifier stack
+        help_url = "https://github.com/smokejohn/SKkeeper/blob/master/readme.md"
+        if receiver.data.shape_keys is None:
+            error_msg = ("IMPOSSIBLE TO TRANSFER SHAPEKEY BECAUSE OF VERTEX COUNT MISMATCH\n\n"
+                         "The processed shapekey {} with name {} cannot be transferred.\n"
+                         "The shapekey doesn't have the same vertex count as the base after applying modifiers.\n"
+                         "This is most likely due to a problematic modifier in your modifier stack (Decimate, Weld)\n\n"
+                         "For help on how to fix problems visit: {}).\n\n"
+                         "Press UNDO to return to your previous working state."
+                        )
+            self.report({'ERROR'}, error_msg.format(shapekey_index, shapekey_names[shapekey_index], help_url))
+            return {'CANCELLED'}
+
+        # due to problematic shape key
+        num_transferred_keys = len(receiver.data.shape_keys.key_blocks) - 1
+        if num_transferred_keys != shapekey_index:
+            error_msg = ("IMPOSSIBLE TO TRANSFER SHAPEKEY BECAUSE OF VERTEX COUNT MISMATCH\n\n"
+                         "The processed shapekey {} with name {} cannot be transferred.\n"
+                         "The shapekey doesn't have the same vertex count as the base after applying modifiers.\n"
+                         "For help on how to fix problems visit: {}).\n\n"
+                         "Press UNDO to return to your previous working state."
+                        )
+            self.report({'ERROR'}, error_msg.format(shapekey_index, shapekey_names[shapekey_index], help_url))
+            return {'CANCELLED'}
+
+        # restore the shapekey name
+        receiver.data.shape_keys.key_blocks[shapekey_index].name = shapekey_names[shapekey_index]
+
+        # delete the shapekey donor and its mesh datablock (save memory)
+        mesh_data = shapekey_obj.data
+        bpy.data.objects.remove(shapekey_obj)
+        bpy.data.meshes.remove(mesh_data)
+
+
+    # delete the original and its mesh data
+    orig_name = self.obj.name
+    orig_data = self.obj.data
+    bpy.data.objects.remove(self.obj)
+    bpy.data.meshes.remove(orig_data)
+
+    # rename the receiver
+    receiver.name = orig_name
+
+    return {'FINISHED'}
+
+
+#####################
+# BLENDER OPERATORS #
+#####################
+
 class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
 
@@ -171,26 +312,7 @@ class SK_OT_apply_mods_SK(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def validate_input(self, obj):
-        # GUARD CLAUSES | USER ERROR
-
-        # check for valid selection
-        if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
-
-        # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
-
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
-
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
+        if common_validation(self) == {'CANCELLED'}:
             return {'CANCELLED'}
 
         # check for modifiers
@@ -201,55 +323,12 @@ class SK_OT_apply_mods_SK(Operator):
     def execute(self, context):
         self.obj = context.active_object
 
-        # check for valid object
+        # Exit out if the selected object is not valid
         if self.validate_input(self.obj) == {'CANCELLED'}:
             return {'CANCELLED'}
 
-        # VALID OBJECT
+        return keep_shapekeys(self, mode=Mode.ALL)
 
-        # get the shapekey names
-        sk_names = []
-        for block in self.obj.data.shape_keys.key_blocks:
-            sk_names.append(block.name)
-
-        # create receiving object that will contain all collapsed shapekeys
-        receiver = copy_object(self.obj, times=1, offset=0)[0]
-        receiver.name = "sk_receiver"
-        apply_shapekey(receiver, 0)
-        apply_modifiers(receiver)
-
-        num_shapes = len(self.obj.data.shape_keys.key_blocks)
-
-        # create a copy for each blendshape and transfer it to the receiver one after the other
-        # start the loop at 1 so we skip the base shapekey
-        for i in range(1, num_shapes):
-            # copy of baseobject / blendshape donor
-            blendshape = copy_object(self.obj, times=1, offset=0)[0]
-            apply_shapekey(blendshape, i)
-            apply_modifiers(blendshape)
-
-            # add the copy as a blendshape to the receiver
-            add_objs_shapekeys(receiver, [blendshape])
-
-            # restore the shapekey name
-            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
-
-            # delete the blendshape donor and its mesh datablock (save memory)
-            mesh_data = blendshape.data
-            bpy.data.objects.remove(blendshape)
-            bpy.data.meshes.remove(mesh_data)
-
-
-        # delete the original and its mesh data
-        orig_name = self.obj.name
-        orig_data = self.obj.data
-        bpy.data.objects.remove(self.obj)
-        bpy.data.meshes.remove(orig_data)
-
-        # rename the receiver
-        receiver.name = orig_name
-
-        return {'FINISHED'}
 
 class SK_OT_apply_subd_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
@@ -258,26 +337,7 @@ class SK_OT_apply_subd_SK(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def validate_input(self, obj):
-        # GUARD CLAUSES | USER ERROR
-
-        # check for valid selection
-        if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
-
-        # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
-
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
-
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
+        if common_validation(self) == {'CANCELLED'}:
             return {'CANCELLED'}
 
         # check for subd modifiers
@@ -289,55 +349,11 @@ class SK_OT_apply_subd_SK(Operator):
     def execute(self, context):
         self.obj = context.active_object
 
-        # check for valid object
+        # Exit out if the selected object is not valid
         if self.validate_input(self.obj) == {'CANCELLED'}:
             return {'CANCELLED'}
 
-        # VALID OBJECT
-
-        # get the shapekey names
-        sk_names = []
-        for block in self.obj.data.shape_keys.key_blocks:
-            sk_names.append(block.name)
-
-        # create receiving object that will contain all collapsed shapekeys
-        receiver = copy_object(self.obj, times=1, offset=0)[0]
-        receiver.name = "sk_receiver"
-        apply_shapekey(receiver, 0)
-        apply_subdmod(receiver)
-
-        num_shapes = len(self.obj.data.shape_keys.key_blocks)
-
-        # create a copy for each blendshape and transfer it to the receiver one after the other
-        # start the loop at 1 so we skip the base shapekey
-        for i in range(1, num_shapes):
-            # copy of baseobject / blendshape donor
-            blendshape = copy_object(self.obj, times=1, offset=0)[0]
-            apply_shapekey(blendshape, i)
-            apply_subdmod(blendshape)
-
-            # add the copy as a blendshape to the receiver
-            add_objs_shapekeys(receiver, [blendshape])
-
-            # restore the shapekey name
-            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
-
-            # delete the blendshape donor and its mesh datablock (save memory)
-            mesh_data = blendshape.data
-            bpy.data.objects.remove(blendshape)
-            bpy.data.meshes.remove(mesh_data)
-
-
-        # delete the original and its mesh data
-        orig_name = self.obj.name
-        orig_data = self.obj.data
-        bpy.data.objects.remove(self.obj)
-        bpy.data.meshes.remove(orig_data)
-
-        # rename the receiver
-        receiver.name = orig_name
-
-        return {'FINISHED'}
+        return keep_shapekeys(self, mode=Mode.SUBD)
 
 class SK_OT_apply_mods_choice_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
@@ -350,26 +366,7 @@ class SK_OT_apply_mods_choice_SK(Operator):
     def invoke(self, context, event):
         self.obj = context.active_object
 
-        # GUARD CLAUSES | USER ERROR
-
-        # check for valid selection
-        if not self.obj:
-            self.report({'ERROR'}, "No Active object. Please select an object")
-            return {'CANCELLED'}
-
-        # check for valid obj-type
-        if self.obj.type != 'MESH':
-            self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
-            return {'CANCELLED'}
-
-        # check for shapekeys
-        if not self.obj.data.shape_keys:
-            self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-            return {'CANCELLED'}
-
-        # check for multiple shapekeys
-        if len(self.obj.data.shape_keys.key_blocks) == 1:
-            self.report({'ERROR'}, "The selected object only has a base shapekey")
+        if common_validation(self) == {'CANCELLED'}:
             return {'CANCELLED'}
 
         # check for modifiers
@@ -387,66 +384,7 @@ class SK_OT_apply_mods_choice_SK(Operator):
         return context.window_manager.invoke_props_dialog(self, width=350)
 
     def execute(self, context):
-
-        # VALID OBJECT
-
-        # get the shapekey names
-        sk_names = []
-        for block in self.obj.data.shape_keys.key_blocks:
-            sk_names.append(block.name)
-
-        # create receiving object that will contain all collapsed shapekeys
-        receiver = copy_object(self.obj, times=1, offset=0)[0]
-        receiver.name = "sk_receiver"
-        # bake in the shapekey
-        apply_shapekey(receiver, 0)
-        # apply the selected modifiers
-        for entry in self.resource_list:
-            if entry.selected:
-                apply_modifier(receiver, entry.name)
-        # change its name
-
-        # get the number of shapekeys on the original mesh
-        num_shapes = len(self.obj.data.shape_keys.key_blocks)
-
-        # create a copy for each blendshape and transfer it to the receiver one after the other
-        # start the loop at 1 so we skip the base shapekey
-        for i in range(1, num_shapes):
-            # copy of baseobject / blendshape donor
-            blendshape = copy_object(self.obj, times=1, offset=0)[0]
-            # bake shapekey
-            apply_shapekey(blendshape, i)
-            # # apply the selected modifiers
-            for entry in self.resource_list:
-                if entry.selected:
-                    log(entry.name)
-                    apply_modifier(blendshape, entry.name)
-
-            # remove all the other modifiers
-            # they are not needed the receiver object has them
-            remove_modifiers(blendshape)
-
-            # add the copy as a blendshape to the receiver
-            add_objs_shapekeys(receiver, [blendshape])
-
-            # restore the shapekey name
-            receiver.data.shape_keys.key_blocks[i].name = sk_names[i]
-
-            # delete the blendshape donor and its mesh datablock (save memory)
-            mesh_data = blendshape.data
-            bpy.data.objects.remove(blendshape)
-            bpy.data.meshes.remove(mesh_data)
-
-        # delete the original and its mesh data
-        orig_name = self.obj.name
-        orig_data = self.obj.data
-        bpy.data.objects.remove(self.obj)
-        bpy.data.meshes.remove(orig_data)
-
-        # rename the receiver
-        receiver.name = orig_name
-
-        return {'FINISHED'}
+        return keep_shapekeys(self, mode=Mode.SELECTED)
 
     def draw(self, context):
         """ Draws the resource selection GUI """
@@ -475,11 +413,15 @@ def register():
     for cls in classes:
         register_class(cls)
 
+    log("Registered SKKeeper addon")
+
     bpy.types.VIEW3D_MT_object.append(modifier_panel)
 
 def unregister():
     from bpy.utils import unregister_class
     for cls in classes:
         unregister_class(cls)
+
+    log("Unregistered SKKeeper addon")
 
     bpy.types.VIEW3D_MT_object.remove(modifier_panel)

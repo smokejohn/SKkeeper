@@ -1,7 +1,7 @@
 #!/bin/bash
 
 name=SKkeeper
-version=v1.6
+version=v1.7
 folder=./SKkeeper
 
 mkdir "$folder"
