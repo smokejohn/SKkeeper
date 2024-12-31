@@ -67,7 +67,7 @@ counts) each time. Here you need to work through your modifier stack and make su
 the vertex counts / edge counts are the same each time. Usual suspects for failing modifier stacks are:
 
 * Decimate
-* Weld (with very small merge thresholds)
+* Weld (with very large merge thresholds)
 
 #### A specific shapekey fails
 
