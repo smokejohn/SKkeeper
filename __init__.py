@@ -19,13 +19,14 @@
 
 bl_info = {
         "name": "SKkeeper",
-        "author": "Johannes Rauch",
-        "version": (1, 7),
-        "blender": (2, 80, 3),
-        "location": "Search > Apply modifiers (Keep Shapekeys)",
         "description": "Applies modifiers and keeps shapekeys",
-        "category": "Utility",
-        "wiki_url": "https://github.com/smokejohn/SKkeeper",
+        "author": "Johannes Rauch",
+        "version": (1, 8, 0),
+        "blender": (2, 80, 3),
+        "location": "View3D > Object",
+        "doc_url": "https://github.com/smokejohn/SKkeeper",
+        "tracker_url": "https://github.com/smokejohn/SKkeeper/issues",
+        "category": "Object",
         }
 
 import time
@@ -285,10 +286,25 @@ def keep_shapekeys(self, mode=Mode.ALL):
         bpy.data.objects.remove(shapekey_obj)
         bpy.data.meshes.remove(mesh_data)
 
-
-    # delete the original and its mesh data
     orig_name = self.obj.name
     orig_data = self.obj.data
+
+    # transfer over drivers on shapekeys if they exist
+    if orig_data.shape_keys.animation_data is not None:
+        receiver.data.shape_keys.animation_data_create()
+        for orig_driver in orig_data.shape_keys.animation_data.drivers:
+            receiver.data.shape_keys.animation_data.drivers.from_existing(src_driver=orig_driver)
+
+        # if the driver has variable targets that refer to the original object we need to
+        # retarget them to the new receiver because we delete the original object later
+        for fcurve in receiver.data.shape_keys.animation_data.drivers:
+            for variable in fcurve.driver.variables:
+                for target in variable.targets:
+                    if target.id == self.obj:
+                        target.id = receiver
+
+
+    # delete the original and its mesh data
     bpy.data.objects.remove(self.obj)
     bpy.data.meshes.remove(orig_data)
 
