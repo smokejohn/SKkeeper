@@ -21,7 +21,7 @@ bl_info = {
         "name": "SKkeeper",
         "description": "Applies modifiers and keeps shapekeys",
         "author": "Johannes Rauch",
-        "version": (1, 8, 0),
+        "version": (1, 8, 1),
         "blender": (2, 80, 3),
         "location": "View3D > Object",
         "doc_url": "https://github.com/smokejohn/SKkeeper",
