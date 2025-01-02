@@ -57,9 +57,6 @@ def log(msg):
 def copy_object(obj, times=1, offset=0):
     """ copies the given object and links it to the main collection"""
 
-    # TODO: maybe get the collection of the source and link the object to
-    # that collection instead of the scene main collection
-
     objects = []
     for i in range(0,times):
         copy_obj = obj.copy()
@@ -69,27 +66,6 @@ def copy_object(obj, times=1, offset=0):
 
         bpy.context.collection.objects.link(copy_obj)
         objects.append(copy_obj)
-
-    return objects
-
-def duplicate_object(obj, times=1, offset=0):
-    """ duplicates the given object and its data """
-
-    # DEPRECATED >> USE copy_object instead
-
-    for o in bpy.context.scene.objects:
-        o.select_set(False)
-
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
-
-    objects = []
-    for i in range(0, times):
-        bpy.ops.object.duplicate()
-        copy = bpy.context.active_object
-        copy.name = obj.name + "_shapekey_" + str(i+1)
-        copy.location.x += offset
-        objects.append(copy)
 
     return objects
 
@@ -323,6 +299,7 @@ class SK_TYPE_Resource(PropertyGroup):
 
 class SK_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
+
     bl_idname = "sk.apply_mods_sk"
     bl_label = "Apply All Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
@@ -348,6 +325,7 @@ class SK_OT_apply_mods_SK(Operator):
 
 class SK_OT_apply_subd_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
+
     bl_idname = "sk.apply_subd_sk"
     bl_label = "Apply All Subdivision (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
@@ -373,6 +351,7 @@ class SK_OT_apply_subd_SK(Operator):
 
 class SK_OT_apply_mods_choice_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
+
     bl_idname = "sk.apply_mods_choice_sk"
     bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
@@ -404,6 +383,7 @@ class SK_OT_apply_mods_choice_SK(Operator):
 
     def draw(self, context):
         """ Draws the resource selection GUI """
+
         layout = self.layout
         col = layout.column(align=True)
         for entry in self.resource_list:
@@ -430,7 +410,6 @@ def register():
         register_class(cls)
 
     log("Registered SKKeeper addon")
-
     bpy.types.VIEW3D_MT_object.append(modifier_panel)
 
 def unregister():
@@ -439,5 +418,4 @@ def unregister():
         unregister_class(cls)
 
     log("Unregistered SKKeeper addon")
-
     bpy.types.VIEW3D_MT_object.remove(modifier_panel)

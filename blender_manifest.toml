@@ -1,0 +1,28 @@
+schema_version = "1.0.0"
+
+id = "shapekey_keeper"
+version = "1.8.0"
+name = "SKkeeper"
+tagline = "Applies modifiers while keeping shapekeys and drivers"
+maintainer = "Johannes Rauch"
+type = "add-on"
+website = "https://github.com/smokejohn/SKkeeper"
+tags = ["Object"]
+
+blender_version_min = "2.80.3"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "/.github/",
+  "/.gitignore",
+  "/*.zip",
+  "/tests",
+  "/images",
+  "/build.sh"
+]
