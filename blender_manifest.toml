@@ -9,7 +9,7 @@ type = "add-on"
 website = "https://github.com/smokejohn/SKkeeper"
 tags = ["Object"]
 
-blender_version_min = "2.80.3"
+blender_version_min = "4.2.0"
 
 license = [
   "SPDX:GPL-3.0-or-later",
