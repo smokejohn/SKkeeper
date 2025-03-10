@@ -2,7 +2,7 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: ''
+labels: bug
 assignees: smokejohn
 
 ---
@@ -26,6 +26,7 @@ If applicable, add screenshots to help explain your problem.
 **Desktop (please complete the following information):**
  - Blender Version: [e.g. 3.6]
  - OS: [e.g. Windows, Mac OS]
+ - SKkeeper Version: [e.g. Release 1.80]
 
 **PLEASE attach the file that you are having errors with to your issue message. If it contains sensitive data, remove it and supply a minimal version that still produces the error**
 
