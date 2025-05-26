@@ -316,12 +316,6 @@ def process_multiple_objects(self, context, mode):
 
         log("Processing object: {}".format(obj_name))
 
-        # Apply common validation
-        if obj.type != 'MESH':
-            log("Skipping {}: Not a mesh object".format(obj_name))
-            skipped_count += 1
-            continue
-
         # Check for modifiers based on mode
         if mode == Mode.ALL and len(obj.modifiers) == 0:
             log("Skipping {}: No modifiers".format(obj_name))
@@ -457,6 +451,14 @@ class SK_OT_apply_mods_choice_SK(Operator):
     def invoke(self, context, event):
         self.obj = context.active_object
 
+        # Handle multiple selection case first
+        if len(context.selected_objects) > 1:
+            # Skip common_validation for multiple objects as it will be handled per-object
+            # Ask user if they want to process all selected objects
+            # with all modifiers selected by default
+            return context.window_manager.invoke_props_dialog(self, width=350)
+
+        # Single object validation
         if common_validation(self) == {'CANCELLED'}:
             return {'CANCELLED'}
 
@@ -464,12 +466,6 @@ class SK_OT_apply_mods_choice_SK(Operator):
         if len(self.obj.modifiers) == 0:
             self.report({'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
-
-        # Handle multiple selection case
-        if len(context.selected_objects) > 1:
-            # Ask user if they want to process all selected objects
-            # with all modifiers selected by default
-            return context.window_manager.invoke_props_dialog(self, width=350)
 
         # For single object, regular behavior
         # populate the resource_list
