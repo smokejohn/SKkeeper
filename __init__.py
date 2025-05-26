@@ -182,7 +182,7 @@ def keep_shapekeys(self, mode=Mode.ALL):
     """
 
     # Check if the object has shapekeys
-    has_shapekeys = self.obj.data.shape_keys is not None and len(self.obj.data.shape_keys.key_blocks) > 1
+    has_shapekeys = self.obj.data.shape_keys is not None and len(self.obj.data.shape_keys.key_blocks) > 0
 
     if not has_shapekeys:
         # Apply modifiers directly if no shapekeys to preserve
