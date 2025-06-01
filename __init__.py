@@ -172,16 +172,6 @@ def common_validation(self):
         self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
         return {'CANCELLED'}
 
-    # check for shapekeys
-    if not self.obj.data.shape_keys:
-        self.report({'ERROR'}, "The selected object doesn't have any shapekeys")
-        return {'CANCELLED'}
-
-    # check for multiple shapekeys
-    if len(self.obj.data.shape_keys.key_blocks) == 1:
-        self.report({'ERROR'}, "The selected object only has a base shapekey")
-        return {'CANCELLED'}
-
 def keep_shapekeys(self, mode=Mode.ALL):
     """
     Function which is used by the blender operators to collapse modifier
@@ -190,6 +180,20 @@ def keep_shapekeys(self, mode=Mode.ALL):
     available blender operators (SUBD, SELECTED, ALL) which collapse only
     subdivision surface, the selected or all modifiers respectively.
     """
+
+    # Check if the object has shapekeys
+    has_shapekeys = self.obj.data.shape_keys is not None and len(self.obj.data.shape_keys.key_blocks) > 0
+
+    if not has_shapekeys:
+        # Apply modifiers directly if no shapekeys to preserve
+        log("Object {} has no shapekeys, applying modifiers directly".format(self.obj.name))
+        if mode == Mode.ALL:
+            apply_modifiers(self.obj)
+        elif mode == Mode.SUBD:
+            apply_subdmod(self.obj)
+        elif mode == Mode.SELECTED:
+            apply_selected_modifiers(self.obj, self.resource_list)
+        return {'FINISHED'}
 
     shapekey_names = [block.name for block in self.obj.data.shape_keys.key_blocks]
 
