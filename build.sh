@@ -3,7 +3,7 @@
 # This file can be used to build the addon zip file without using blender 4.2.0
 
 name=SKkeeper
-version=v1.8.1
+version=v1.8.2
 folder=./SKkeeper
 
 mkdir "$folder"

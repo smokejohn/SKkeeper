@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "shapekey_keeper"
-version = "1.8.1"
+version = "1.8.2"
 name = "SKkeeper"
 tagline = "Applies modifiers while keeping shapekeys and drivers"
 maintainer = "Johannes Rauch"
