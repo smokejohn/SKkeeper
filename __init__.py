@@ -1,41 +1,39 @@
 ##
-##  GPL License
+# GPL License
 ##
-##  Blender Addon | SKkeeper
-##  Copyright (C) 2020  Johannes Rauch
+# Blender Addon | SKkeeper
+# Copyright (C) 2020  Johannes Rauch
 ##
-##  This program is free software: you can redistribute it and/or modify
-##  it under the terms of the GNU General Public License as published by
-##  the Free Software Foundation, either version 3 of the License, or
-##  (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 ##
-##  This program is distributed in the hope that it will be useful,
-##  but WITHOUT ANY WARRANTY; without even the implied warranty of
-##  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-##  GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 ##
-##  You should have received a copy of the GNU General Public License
-##  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-bl_info = {
-        "name": "SKkeeper",
-        "description": "Applies modifiers and keeps shapekeys",
-        "author": "Johannes Rauch",
-        "version": (1, 8, 1),
-        "blender": (2, 80, 3),
-        "location": "View3D > Object",
-        "doc_url": "https://github.com/smokejohn/SKkeeper",
-        "tracker_url": "https://github.com/smokejohn/SKkeeper/issues",
-        "category": "Object",
-        }
-
-import time
-
-from enum import Enum
-
-import bpy
-from bpy.types import Operator, PropertyGroup
 from bpy.props import BoolProperty, CollectionProperty
+from bpy.types import Operator, PropertyGroup
+import bpy
+from enum import Enum
+import time
+bl_info = {
+    "name": "SKkeeper",
+    "description": "Applies modifiers and keeps shapekeys",
+    "author": "Johannes Rauch",
+    "version": (1, 8, 1),
+    "blender": (2, 80, 3),
+    "location": "View3D > Object",
+    "doc_url": "https://github.com/smokejohn/SKkeeper",
+    "tracker_url": "https://github.com/smokejohn/SKkeeper/issues",
+    "category": "Object",
+}
+
 
 class Mode(Enum):
     ALL = 0
@@ -46,6 +44,7 @@ class Mode(Enum):
 # UTILITY FUNCTIONS #
 #####################
 
+
 def log(msg):
     """ prints to console in the following format:
         <SKkeeper Time(HH:MM)> message
@@ -54,11 +53,12 @@ def log(msg):
     current_time = time.strftime("%H:%M", t)
     print("<SKkeeper {}> {}".format(current_time, (msg)))
 
+
 def copy_object(obj, times=1, offset=0):
     """ copies the given object and links it to the main collection"""
 
     objects = []
-    for i in range(0,times):
+    for i in range(0, times):
         copy_obj = obj.copy()
         copy_obj.data = obj.data.copy()
         copy_obj.name = obj.name + "_shapekey_" + str(i+1)
@@ -68,6 +68,7 @@ def copy_object(obj, times=1, offset=0):
         objects.append(copy_obj)
 
     return objects
+
 
 def apply_shapekey(obj, sk_keep):
     """ deletes all shapekeys except the one with the given index """
@@ -86,6 +87,7 @@ def apply_shapekey(obj, sk_keep):
     # remove the chosen one and bake it into the object
     obj.shape_key_remove(shapekeys[0])
 
+
 def apply_modifiers(obj):
     """ applies all modifiers in order """
     # now uses object.convert to circumvent errors with disabled modifiers
@@ -103,6 +105,7 @@ def apply_modifiers(obj):
 
     bpy.ops.object.convert(target='MESH')
 
+
 def apply_selected_modifiers(obj, resource_list):
     """ applies only the user selected modifiers to the object"""
 
@@ -111,12 +114,14 @@ def apply_selected_modifiers(obj, resource_list):
             log("Applying modifier {} on object {}".format(entry.name, obj.name))
             apply_modifier(obj, entry.name)
 
+
 def remove_modifiers(obj):
     """ removes all modifiers from the object """
 
     for i in reversed(range(0, len(obj.modifiers))):
         modifier = obj.modifiers[i]
         obj.modifiers.remove(modifier)
+
 
 def apply_subdmod(obj):
     """ applies subdivision surface modifier """
@@ -131,13 +136,14 @@ def apply_subdmod(obj):
     modifiers[0].show_only_control_edges = False
     bpy.ops.object.modifier_apply(modifier=modifiers[0].name)
 
+
 def apply_modifier(obj, modifier_name):
     """ applies a specific modifier """
 
     log("Applying chosen modifier")
 
     modifier = [mod for mod in obj.modifiers if mod.name == modifier_name][0]
-    
+
     # deselect all
     for o in bpy.context.scene.objects:
         o.select_set(False)
@@ -145,8 +151,10 @@ def apply_modifier(obj, modifier_name):
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=modifier.name)
 
+
 def add_objs_shapekeys(destination, sources):
-    """ takes an array of objects and adds them as shapekeys to the destination object """
+    """ takes an array of objects and adds them as shapekeys to the destination
+    object """
     for o in bpy.context.scene.objects:
         o.select_set(False)
 
@@ -158,7 +166,8 @@ def add_objs_shapekeys(destination, sources):
 
 
 def common_validation(self):
-    """Checks for common user errors for all operators and informs user of mistake"""
+    """Checks for common user errors for all operators and informs user of
+    mistake"""
 
     # GUARD CLAUSES | USER ERROR
 
@@ -169,8 +178,10 @@ def common_validation(self):
 
     # check for valid obj-type
     if self.obj.type != 'MESH':
-        self.report({'ERROR'}, "Wrong object type. Please select a MESH object")
+        self.report(
+            {'ERROR'}, "Wrong object type. Please select a MESH object")
         return {'CANCELLED'}
+
 
 def keep_shapekeys(self, mode=Mode.ALL):
     """
@@ -182,7 +193,8 @@ def keep_shapekeys(self, mode=Mode.ALL):
     """
 
     # Check if the object has shapekeys
-    has_shapekeys = self.obj.data.shape_keys is not None and len(self.obj.data.shape_keys.key_blocks) > 0
+    has_shapekeys = self.obj.data.shape_keys is not None and len(
+        self.obj.data.shape_keys.key_blocks) > 0
 
     if not has_shapekeys:
         # Apply modifiers directly if no shapekeys to preserve
@@ -195,7 +207,8 @@ def keep_shapekeys(self, mode=Mode.ALL):
             apply_selected_modifiers(self.obj, self.resource_list)
         return {'FINISHED'}
 
-    shapekey_names = [block.name for block in self.obj.data.shape_keys.key_blocks]
+    shapekey_names = [
+        block.name for block in self.obj.data.shape_keys.key_blocks]
 
     # create receiving object that will contain all collapsed shapekeys
     receiver = copy_object(self.obj, times=1, offset=0)[0]
@@ -211,12 +224,14 @@ def keep_shapekeys(self, mode=Mode.ALL):
     num_shapekeys = len(self.obj.data.shape_keys.key_blocks)
 
     shapekeys_to_process = len(shapekey_names) - 1
-    log("Processing {} shapekeys on {} in mode {}".format(shapekeys_to_process, self.obj.name, mode))
+    log("Processing {} shapekeys on {} in mode {}".format(
+        shapekeys_to_process, self.obj.name, mode))
 
     # create a copy for each shapekey and transfer it to the receiver one after the other
     # start the loop at 1 so we skip the base shapekey
     for shapekey_index in range(1, num_shapekeys):
-        log("Processing shapekey {} with name {}".format(shapekey_index, shapekey_names[shapekey_index]))
+        log("Processing shapekey {} with name {}".format(
+            shapekey_index, shapekey_names[shapekey_index]))
 
         # copy of baseobject / shapekey donor
         shapekey_obj = copy_object(self.obj, times=1, offset=0)[0]
@@ -231,7 +246,6 @@ def keep_shapekeys(self, mode=Mode.ALL):
         # add the copy as a shapekey to the receiver
         add_objs_shapekeys(receiver, [shapekey_obj])
 
-
         # check if the shapekey could be added
         # due to problematic modifier stack
         help_url = "https://github.com/smokejohn/SKkeeper/blob/master/readme.md#troubleshooting-problems"
@@ -242,8 +256,9 @@ def keep_shapekeys(self, mode=Mode.ALL):
                          "This is most likely due to a problematic modifier in your modifier stack (Decimate, Weld)\n\n"
                          "For help on how to fix problems visit: {}).\n\n"
                          "Press UNDO to return to your previous working state."
-                        )
-            self.report({'ERROR'}, error_msg.format(shapekey_index, shapekey_names[shapekey_index], help_url))
+                         )
+            self.report({'ERROR'}, error_msg.format(
+                shapekey_index, shapekey_names[shapekey_index], help_url))
             return {'CANCELLED'}
 
         # due to problematic shape key
@@ -254,8 +269,9 @@ def keep_shapekeys(self, mode=Mode.ALL):
                          "The shapekey doesn't have the same vertex count as the base after applying modifiers.\n"
                          "For help on how to fix problems visit: {}).\n\n"
                          "Press UNDO to return to your previous working state."
-                        )
-            self.report({'ERROR'}, error_msg.format(shapekey_index, shapekey_names[shapekey_index], help_url))
+                         )
+            self.report({'ERROR'}, error_msg.format(
+                shapekey_index, shapekey_names[shapekey_index], help_url))
             return {'CANCELLED'}
 
         # restore the shapekey name
@@ -273,16 +289,17 @@ def keep_shapekeys(self, mode=Mode.ALL):
     if orig_data.shape_keys.animation_data is not None:
         receiver.data.shape_keys.animation_data_create()
         for orig_driver in orig_data.shape_keys.animation_data.drivers:
-            receiver.data.shape_keys.animation_data.drivers.from_existing(src_driver=orig_driver)
+            receiver.data.shape_keys.animation_data.drivers.from_existing(
+                src_driver=orig_driver)
 
-        # if the driver has variable targets that refer to the original object we need to
-        # retarget them to the new receiver because we delete the original object later
+        # if the driver has variable targets that refer to the original object
+        # we need to retarget them to the new receiver because we delete the
+        # original object later
         for fcurve in receiver.data.shape_keys.animation_data.drivers:
             for variable in fcurve.driver.variables:
                 for target in variable.targets:
                     if target.id == self.obj:
                         target.id = receiver
-
 
     # delete the original and its mesh data
     bpy.data.objects.remove(self.obj)
@@ -293,12 +310,15 @@ def keep_shapekeys(self, mode=Mode.ALL):
 
     return {'FINISHED'}
 
+
 def process_multiple_objects(self, context, mode):
     """
-    Process multiple selected objects, applying modifiers based on the specified mode
+    Process multiple selected objects, applying modifiers based on the
+    specified mode
     """
     # Get all selected objects
-    selected_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+    selected_objects = [
+        obj for obj in context.selected_objects if obj.type == 'MESH']
 
     if not selected_objects:
         self.report({'ERROR'}, "No mesh objects selected")
@@ -335,7 +355,8 @@ def process_multiple_objects(self, context, mode):
 
         # For selected modifiers mode, populate the resource list
         if mode == Mode.SELECTED:
-            # Since we're bypassing invoke(), we need to populate resource_list here
+            # Since we're bypassing invoke(), we need to populate
+            # the resource_list here
             self.resource_list.clear()
             for mod in obj.modifiers:
                 entry = self.resource_list.add()
@@ -365,7 +386,8 @@ def process_multiple_objects(self, context, mode):
         self.report({'INFO'}, message)
     else:
         if error_count > 0:
-            self.report({'ERROR'}, "Failed to process any objects, encountered {} errors".format(error_count))
+            self.report(
+                {'ERROR'}, "Failed to process any objects, encountered {} errors".format(error_count))
         else:
             self.report({'WARNING'}, "No valid objects processed")
 
@@ -378,8 +400,10 @@ def process_multiple_objects(self, context, mode):
 # BLENDER OPERATORS #
 #####################
 
+
 class SK_TYPE_Resource(PropertyGroup):
     selected: BoolProperty(name="Selected", default=False)
+
 
 class SK_OT_apply_mods_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
@@ -394,7 +418,8 @@ class SK_OT_apply_mods_SK(Operator):
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
+            self.report(
+                {'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
 
     def execute(self, context):
@@ -426,7 +451,8 @@ class SK_OT_apply_subd_SK(Operator):
         # check for subd modifiers
         subd = [mod for mod in self.obj.modifiers if mod.type == 'SUBSURF']
         if len(subd) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any subdivision surface modifiers")
+            self.report(
+                {'ERROR'}, "The selected object doesn't have any subdivision surface modifiers")
             return {'CANCELLED'}
 
     def execute(self, context):
@@ -443,6 +469,7 @@ class SK_OT_apply_subd_SK(Operator):
 
         return keep_shapekeys(self, mode=Mode.SUBD)
 
+
 class SK_OT_apply_mods_choice_SK(Operator):
     """ Applies modifiers and keeps shapekeys """
 
@@ -450,14 +477,16 @@ class SK_OT_apply_mods_choice_SK(Operator):
     bl_label = "Apply Chosen Modifiers (Keep Shapekeys)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    resource_list : CollectionProperty(name="Modifier List", type=SK_TYPE_Resource)
+    resource_list: CollectionProperty(
+        name="Modifier List", type=SK_TYPE_Resource)
 
     def invoke(self, context, event):
         self.obj = context.active_object
 
         # Handle multiple selection case first
         if len(context.selected_objects) > 1:
-            # Skip common_validation for multiple objects as it will be handled per-object
+            # Skip common_validation for multiple objects as it will be handled
+            # per-object
             # Ask user if they want to process all selected objects
             # with all modifiers selected by default
             return context.window_manager.invoke_props_dialog(self, width=350)
@@ -468,7 +497,8 @@ class SK_OT_apply_mods_choice_SK(Operator):
 
         # check for modifiers
         if len(self.obj.modifiers) == 0:
-            self.report({'ERROR'}, "The selected object doesn't have any modifiers")
+            self.report(
+                {'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
 
         # For single object, regular behavior
@@ -496,7 +526,8 @@ class SK_OT_apply_mods_choice_SK(Operator):
 
         # If multiple objects are selected, show a different UI
         if len(context.selected_objects) > 1:
-            layout.label(text="Process {} selected objects?".format(len(context.selected_objects)))
+            layout.label(text="Process {} selected objects?".format(
+                len(context.selected_objects)))
             layout.label(text="All modifiers will be applied for each object")
             return
 
@@ -508,12 +539,14 @@ class SK_OT_apply_mods_choice_SK(Operator):
             row = col.row()
             row.prop(entry, 'selected', text=entry.name)
 
+
 classes = (
-        SK_TYPE_Resource,
-        SK_OT_apply_mods_SK,
-        SK_OT_apply_subd_SK,
-        SK_OT_apply_mods_choice_SK
-        )
+    SK_TYPE_Resource,
+    SK_OT_apply_mods_SK,
+    SK_OT_apply_subd_SK,
+    SK_OT_apply_mods_choice_SK
+)
+
 
 def modifier_panel(self, context):
     layout = self.layout
@@ -522,6 +555,7 @@ def modifier_panel(self, context):
     layout.operator("sk.apply_subd_sk")
     layout.operator("sk.apply_mods_choice_sk")
 
+
 def register():
     from bpy.utils import register_class
     for cls in classes:
@@ -529,6 +563,7 @@ def register():
 
     log("Registered SKKeeper addon")
     bpy.types.VIEW3D_MT_object.append(modifier_panel)
+
 
 def unregister():
     from bpy.utils import unregister_class
