@@ -289,6 +289,86 @@ def keep_shapekeys(self, mode=Mode.ALL):
 
     return {'FINISHED'}
 
+def process_multiple_objects(self, context, mode):
+    """
+    Process multiple selected objects, applying modifiers based on the specified mode
+    """
+    # Get all selected objects
+    selected_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+
+    if not selected_objects:
+        self.report({'ERROR'}, "No mesh objects selected")
+        return {'CANCELLED'}
+
+    processed_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    log("Processing {} objects in mode {}".format(len(selected_objects), mode))
+
+    # Process each selected object
+    for obj in selected_objects[:]:
+        obj_name = obj.name
+
+        # Make this the active object
+        context.view_layer.objects.active = obj
+        self.obj = obj
+
+        log("Processing object: {}".format(obj_name))
+
+        # Check for modifiers based on mode
+        if mode == Mode.ALL and len(obj.modifiers) == 0:
+            log("Skipping {}: No modifiers".format(obj_name))
+            skipped_count += 1
+            continue
+
+        if mode == Mode.SUBD:
+            subd = [mod for mod in obj.modifiers if mod.type == 'SUBSURF']
+            if len(subd) == 0:
+                log("Skipping {}: No subdivision modifiers".format(obj_name))
+                skipped_count += 1
+                continue
+
+        # For selected modifiers mode, populate the resource list
+        if mode == Mode.SELECTED:
+            # Since we're bypassing invoke(), we need to populate resource_list here
+            self.resource_list.clear()
+            for mod in obj.modifiers:
+                entry = self.resource_list.add()
+                entry.name = mod.name
+                entry.selected = True  # Select all by default when batch processing
+
+        # Process the object
+        try:
+            result = keep_shapekeys(self, mode=mode)
+            if result == {'CANCELLED'}:
+                log("Error processing {}".format(obj_name))
+                error_count += 1
+            else:
+                log("Successfully processed {}".format(obj_name))
+                processed_count += 1
+        except Exception as e:
+            log("Exception processing {}: {}".format(obj_name, str(e)))
+            error_count += 1
+
+    # Report results
+    if processed_count > 0:
+        message = "Applied modifiers on {} objects".format(processed_count)
+        if skipped_count > 0:
+            message += ", skipped {} objects".format(skipped_count)
+        if error_count > 0:
+            message += ", encountered errors on {} objects".format(error_count)
+        self.report({'INFO'}, message)
+    else:
+        if error_count > 0:
+            self.report({'ERROR'}, "Failed to process any objects, encountered {} errors".format(error_count))
+        else:
+            self.report({'WARNING'}, "No valid objects processed")
+
+    if processed_count > 0:
+        return {'FINISHED'}
+    else:
+        return {'CANCELLED'}
 
 #####################
 # BLENDER OPERATORS #
@@ -314,6 +394,11 @@ class SK_OT_apply_mods_SK(Operator):
             return {'CANCELLED'}
 
     def execute(self, context):
+        # Check if multiple objects are selected
+        if len(context.selected_objects) > 1:
+            return process_multiple_objects(self, context, Mode.ALL)
+
+        # Single-object behavior
         self.obj = context.active_object
 
         # Exit out if the selected object is not valid
@@ -341,6 +426,11 @@ class SK_OT_apply_subd_SK(Operator):
             return {'CANCELLED'}
 
     def execute(self, context):
+        # Check if multiple objects are selected
+        if len(context.selected_objects) > 1:
+            return process_multiple_objects(self, context, Mode.SUBD)
+
+        # Single-object behavior
         self.obj = context.active_object
 
         # Exit out if the selected object is not valid
@@ -361,6 +451,14 @@ class SK_OT_apply_mods_choice_SK(Operator):
     def invoke(self, context, event):
         self.obj = context.active_object
 
+        # Handle multiple selection case first
+        if len(context.selected_objects) > 1:
+            # Skip common_validation for multiple objects as it will be handled per-object
+            # Ask user if they want to process all selected objects
+            # with all modifiers selected by default
+            return context.window_manager.invoke_props_dialog(self, width=350)
+
+        # Single object validation
         if common_validation(self) == {'CANCELLED'}:
             return {'CANCELLED'}
 
@@ -369,6 +467,7 @@ class SK_OT_apply_mods_choice_SK(Operator):
             self.report({'ERROR'}, "The selected object doesn't have any modifiers")
             return {'CANCELLED'}
 
+        # For single object, regular behavior
         # populate the resource_list
         self.resource_list.clear()
         for mod in self.obj.modifiers:
@@ -379,12 +478,27 @@ class SK_OT_apply_mods_choice_SK(Operator):
         return context.window_manager.invoke_props_dialog(self, width=350)
 
     def execute(self, context):
+        # Check for multiple selected objects
+        if len(context.selected_objects) > 1:
+            return process_multiple_objects(self, context, Mode.SELECTED)
+
+        # Single-object behavior
         return keep_shapekeys(self, mode=Mode.SELECTED)
 
     def draw(self, context):
         """ Draws the resource selection GUI """
 
         layout = self.layout
+
+        # If multiple objects are selected, show a different UI
+        if len(context.selected_objects) > 1:
+            layout.label(text="Process {} selected objects?".format(len(context.selected_objects)))
+            layout.label(text="All modifiers will be applied for each object")
+            return
+
+        # Regular UI for single object
+        obj = context.active_object
+        layout.label(text="Select modifiers to apply on {}".format(obj.name))
         col = layout.column(align=True)
         for entry in self.resource_list:
             row = col.row()
